@@ -1,0 +1,13 @@
+Package: analyse
+Type: Package
+Title: Analyse
+Version: 0.0.0.9000
+Date: 2020-01-27
+Author: ngusarov
+Maintainer: ngusarov <ngusarv@gmail.com>
+Description: Tools for automated model selection in R
+Imports: tidyverse, lmtest, mctest, glmnet, filehash, foreach, parallel, doParallel, forecast, tseries, ggfortify
+License: MIT
+Encoding: UTF-8
+LazyData: true
+RoxygenNote: 6.1.1
