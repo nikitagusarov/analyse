@@ -3,53 +3,135 @@
 #' This function allows to select by informational criteria and performance results one or a serie of different models allowing for best performance in and out of sample. The function is a wrapper for forecast and tseries packages.
 #' 
 #' @param seriex A univariate time serie to be studied
-#' @param laglim The maximum difference limit for I part (it is the same for ordinary and seasonal components)
+#' @param order The maximum limit for p, d and q for ordinary ARIMA part
+#' @param seasonallim The maximum limit for P, D and Q for SARIMA part
 #' @param crossvalid The point for cross-validation
 #' @param limit A maximum number of models to be selected by criteria (3 in sample and 3 out of sample criterias are used)
 #' @param method The estimation method to be applied (as in the timeserie package)
+#' @param adf.plim ADF selection probability limit
+#' @param partlim Part of autocorrelated lags in lags
 #' 
 #' @return A list of selected models estimated with SARIMA with additional performance information
-#' \describe{
-#' \item{crit_study}{A data.frame of main in-sample choice criterias for selected models}
-#' \item{crit_test}{A data.frame of main out of sample choice criterias for selected models}
-#' \item{plot_study}{Autoplot predictions for best in-sample models}
-#' \item{plot_test}{Autoplot predictions for best out of sample models}
-#' \item{t_stat}{Test statistics for tests}
-#' \item{t_pval}{P-values for tests}
-#' \item{models}{The results for selected models}
-#' \item{plots}{Grid-arranged Acf and Pacf plots for each difference sequence}
-#' }
-#' @keywords MCOanalyse
+#' 
+#' @keywords ARIMAanalyse
 #' @export
 #' @examples
-#' ARIMAanalyse(seriex, 
-#'      laglim = 5, crossvalid = c(2015, 4), limit = 3, 
-#'      method = "ML")
+#' ARIMAanalyse = function(seriex, 
+#'    orderlim = c(1, 1, 1), seasonallim = c(1, 1, 1), 
+#'    crossvalid = c(2015, 4), limit = 3, 
+#'    method = "ML", adf.plim = 0.1, partlim = 0.3)
+#'    
 #' @import tidyverse
 #' @import tseries
 #' @import ggfortify
+#' @import gridExtra
 #' @import forecast
 #' @import car
 #' @import lmtest
 #' 
 ARIMAanalyse = function(seriex, # Time serie
-    laglim = 1, # Difference limit
+    orderlim = c(1, 1, 1), # Difference limit
+    seasonallim = c(1, 1, 1), # Seasonal part limit
     crossvalid = c(2015, 4), # Validation division point
     limit = 3, # Number of models selected by criteria
-    method = "ML") { # Estimation method
-    ###########
-    # Libraries 
-    ###########
-    library(tidyverse)
-    library(ggfortify)
-    library(forecast)
-    library(tseries)
+    method = "ML", # Estimation method
+    adf.plim = 0.1, # ADF selection probability limit
+    partlim = 0.3 # Part of autocorrelated lags in lags
+    ) { 
+    #######+###################    
+    # Tests+# Exploratory plots
+    #######+###################
+    # Lagorder 
+    lago = crossing(d = 0:orderlim[2], D = 0:seasonallim[2])
+    # Frame creation
+    tests = data.frame(matrix(NA, 
+        nrow = nrow(lago), 
+        ncol = 5))
+    names(tests) = c("d", "D",
+        "ADF", "KPSS.L", "KPSS.T")
+    tests[,1] = lago[,1]
+    tests[,2] = lago[,2]
+    # Statistics frame creation
+    statistics = data.frame(matrix(NA, 
+        nrow = nrow(lago), 
+        ncol = 6))
+    names(statistics) = c("d", "D",
+        "ADF", "KPSS.L", "KPSS.T",
+        "DW")
+    statistics[,1] = lago[,1]
+    statistics[,2] = lago[,2]
+    # Correlation 
+    acorrelation = list()
+    pcorrelation = list()
+    # Plots
+    cfplots = list()
+    # Loop
+    for (i in 0:(nrow(lago)-1)) {
+        if (statistics[i+1,1] != 0) {
+            ser = diff(seriex, 
+                lag = attributes(seriex)$tsp[3], 
+                dif = tests[i+1,1])
+        } else {ser = seriex}
+        if (statistics[i+1,2] != 0) {
+            ser = diff(ser,
+                lag = 1, 
+                dif = tests[i+1,2])
+        } else {ser = ser}
+        # Tests P-VALUES dataframe
+        tests[i+1, 3] = adf.test(ser)$p.value
+        tests[i+1, 4] = kpss.test(ser,null = "Level")$p.value
+        tests[i+1, 5] = kpss.test(ser,null = "Trend")$p.value
+        statistics[i+1, 3] = adf.test(ser)$statistic
+        # Tests STATISTICS dataframe
+        statistics[i+1, 4] = kpss.test(ser,null = "Level")$statistic
+        statistics[i+1, 5] = kpss.test(ser,null = "Trend")$statistic
+        statistics[i+1, 6] = durbinWatsonTest(as.integer(ser))
+        # Values
+        s_level = 
+            qnorm((1 + 0.95)/2)/sqrt(sum(!is.na(ser)))
+        acorrelation[[i+1]] = 
+            sum(abs(acf(ser, plot = F)$acf)/s_level > 1)/as.integer(10*log10(length(ser)))
+        pcorrelation[[i+1]] = 
+            sum(abs(pacf(ser, plot = F)$acf)/s_level > 1)/as.integer(10*log10(length(ser)))
+        # CFs
+        cf = ggAcf(ser, plot = F)
+        pcf = ggPacf(ser, plot = F)
+        # Plots
+        placf = autoplot(cf) + 
+            ggtitle(paste("Differences :", tests[i+1,1], tests[i+1,2], sep = " "))
+        plpacf = autoplot(pcf) + 
+            ggtitle(paste("Differences :", tests[i+1,1], tests[i+1,2], sep = " "))
+        cfplots[[i+1]] = grid.arrange(placf, plpacf, nrow = 1)
+    }
+    ##############################
+    # Analyse and preselect models
+    ##############################
+    # Selection by correlation  
+    nn = intersect(which(acorrelation < partlim), 
+        which(pcorrelation < partlim))
+    # Selection by test results
+    an = tests[nn,] %>% 
+        filter(ADF < adf.plim & 
+            (KPSS.L >= 0.1 | KPSS.T >= 0.1)) %>%
+        select(d, D)
     #######################
     # Combinations creation
     #######################
-    bin = c(0:laglim)
-    comb = crossing(yar = bin, yi = bin, yma = bin,
-            sar = bin, si = bin, sma = bin) 
+    dbin = as.integer(an$d)
+    Dbin = as.integer(an$D)
+    comb = crossing(p = c(0:orderlim[1]), 
+        d = dbin, 
+        q = c(0:orderlim[3]),
+        P = c(0:seasonallim[1]), 
+        D = Dbin, 
+        Q = c(0:seasonallim[3]))
+    if (nrow(comb) == 0) {
+        results = list(tests = list(pval = tests,
+                stat = statistics), 
+            plots = cfplots)
+        return(results)
+        stop("No satisfying difference orders detected")
+        }
     comb = comb %>% 
         mutate(n = 1:nrow(comb))
     ##############
@@ -85,15 +167,15 @@ ARIMAanalyse = function(seriex, # Time serie
                 n = i)
     }
     # Loglik normalisation
-    lago = crossing(yi = bin, si = bin)
+    lago = crossing(d = dbin, D = Dbin)
     # Loop
     for (i in 1:nrow(lago)) {
-        sell = left_join(lago[i,], comb, by = c("yi", "si")) %>% 
+        sell = left_join(lago[i,], comb, by = c("d", "D")) %>% 
             mutate(ko = i, 
-                kk = as.integer(yar == 0 &
-                    yma == 0 &
-                    sar == 0 &
-                    sma == 0)) %>% 
+                kk = as.integer(p == 0 &
+                    q == 0 &
+                    P == 0 &
+                    Q == 0)) %>% 
             select(n, ko, kk)
         frame[sell$n[sell$kk == 0],] = 
             frame[sell$n[sell$kk == 0],] %>% 
@@ -120,22 +202,27 @@ ARIMAanalyse = function(seriex, # Time serie
     # Optimums study
     ################
     # Criteria
-    cc2 = frameX %>%
-        dplyr::arrange(CC2) %>%
+    cca = frameX %>%
+        dplyr::arrange(AIC) %>%
         head(limit) %>% 
         select(n) %>%
-        mutate(TYPE = "AIC+BIC")
-    ccl = frameX %>%
-        dplyr::arrange(lk) %>%
+        mutate(TYPE = "AIC")
+    ccb = frameX %>%
+        dplyr::arrange(BIC) %>%
         head(limit) %>% 
         select(n) %>%
-        mutate(TYPE = "Log-Lik")
+        mutate(TYPE = "BIC")
+    # ccl = frameX %>%
+    #     dplyr::arrange(lk) %>%
+    #     head(limit) %>% 
+    #     select(n) %>%
+    #     mutate(TYPE = "Log-Lik")
     ccs = frameX %>%
         dplyr::arrange(sigma2) %>%
         head(limit) %>% 
         select(n) %>%
         mutate(TYPE = "Sigma2")
-    ccx = rbind(cc2, ccl) %>% 
+    ccx = rbind(cca, ccb) %>% 
         rbind(ccs)
     # Presentation results
     cc = left_join(ccx, comb)
@@ -245,82 +332,20 @@ ARIMAanalyse = function(seriex, # Time serie
     toplot2 = ts(toplot2, 
         start = attributes(serie)$tsp[2],
         freq = attributes(serie)$tsp[3])
-    #######+###################    
-    # Tests+# Exploratory plots
-    #######+###################
-    # Packages
-    library(car)
-    library(lmtest)
-    # Lagorder 
-    lago = crossing(Y_lag = bin, S_Lag = bin)
-    # Frame creation
-    tests = data.frame(matrix(NA, 
-        nrow = nrow(lago), 
-        ncol = 5))
-    names(tests) = c("Y_Lag", "S_Lag",
-        "ADF", "KPSS.L", "KPSS.T")
-    tests[,1] = lago[,1]
-    tests[,2] = lago[,2]
-    # Loop
-    for(i in 0:(nrow(lago)-1)) {
-        if (tests[i+1,1] != 0) {
-            ser = diff(seriex, 
-                lag = attributes(seriex)$tsp[3], 
-                dif = tests[i+1,1])
-        } else {ser = seriex}
-        if (tests[i+1,2] != 0) {
-            ser = diff(ser,
-                lag = 1, 
-                dif = tests[i+1,2])
-        } else {ser = ser}
-        tests[i+1, 3] = adf.test(ser)$p.value
-        tests[i+1, 4] = kpss.test(ser,null = "Level")$p.value
-        tests[i+1, 5] = kpss.test(ser,null = "Trend")$p.value
-    }
-    # Statistics frame creation
-    statistics = data.frame(matrix(NA, 
-        nrow = nrow(lago), 
-        ncol = 6))
-    names(statistics) = c("Y_Lag", "S_Lag",
-        "ADF", "KPSS.L", "KPSS.T",
-        "DW")
-    statistics[,1] = lago[,1]
-    statistics[,2] = lago[,2]
-    plots = list()
-    # Loop
-    for(i in 0:(nrow(lago)-1)) {
-        if (statistics[i+1,1] != 0) {
-            ser = diff(seriex, 
-                lag = attributes(seriex)$tsp[3], 
-                dif = tests[i+1,1])
-        } else {ser = seriex}
-        if (statistics[i+1,2] != 0) {
-            ser = diff(ser,
-                lag = 1, 
-                dif = tests[i+1,2])
-        } else {ser = ser}
-        statistics[i+1, 3] = adf.test(ser)$statistic
-        statistics[i+1, 4] = kpss.test(ser,null = "Level")$statistic
-        statistics[i+1, 5] = kpss.test(ser,null = "Trend")$statistic
-        statistics[i+1, 6] = durbinWatsonTest(as.integer(ser))
-        # Plots
-        placf = ggAcf(ser) + 
-            ggtitle(paste("Differences :", tests[i+1,1], tests[i+1,2], sep = " "))
-        plpacf = ggPacf(ser) + 
-            ggtitle(paste("Differences :", tests[i+1,1], tests[i+1,2], sep = " "))
-        plots[[i+1]] = grid.arrange(placf, plpacf, nrow = 1)
-    }
     #########
     # Results
-    #########    
-    results = list(crit_study = cc, 
-        crit_test = rcc,
-        plot_study = toplot1, 
-        plot_test = toplot2,
-        t_stat = statistics,
-        t_pval = tests,
+    #########   
+    crit = list(study = cc, 
+        test = rcc) 
+    plotx = list(study = toplot1, 
+        test = toplot2)
+    tests = list(stat = statistics,
+        pval = tests)
+    results = list(crit = crit,
+        predict = plotx,
+        tests = tests,
         models = model,
-        plots = plots)
+        cfplots = cfplots)
     # Output
     return(results)
 }

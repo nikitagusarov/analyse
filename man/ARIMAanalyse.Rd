@@ -4,39 +4,38 @@
 \alias{ARIMAanalyse}
 \title{ARIMA model choice automation}
 \usage{
-ARIMAanalyse(seriex, laglim = 1, crossvalid = c(2015, 4), limit = 3,
-  method = "ML")
+ARIMAanalyse(seriex, orderlim = c(1, 1, 1), seasonallim = c(1, 1, 1),
+  crossvalid = c(2015, 4), limit = 3, method = "ML",
+  adf.plim = 0.1, partlim = 0.3)
 }
 \arguments{
 \item{seriex}{A univariate time serie to be studied}
 
-\item{laglim}{The maximum difference limit for I part (it is the same for ordinary and seasonal components)}
+\item{seasonallim}{The maximum limit for P, D and Q for SARIMA part}
 
 \item{crossvalid}{The point for cross-validation}
 
 \item{limit}{A maximum number of models to be selected by criteria (3 in sample and 3 out of sample criterias are used)}
 
 \item{method}{The estimation method to be applied (as in the timeserie package)}
+
+\item{adf.plim}{ADF selection probability limit}
+
+\item{partlim}{Part of autocorrelated lags in lags}
+
+\item{order}{The maximum limit for p, d and q for ordinary ARIMA part}
 }
 \value{
 A list of selected models estimated with SARIMA with additional performance information
-\describe{
-\item{crit_study}{A data.frame of main in-sample choice criterias for selected models}
-\item{crit_test}{A data.frame of main out of sample choice criterias for selected models}
-\item{plot_study}{Autoplot predictions for best in-sample models}
-\item{plot_test}{Autoplot predictions for best out of sample models}
-\item{t_stat}{Test statistics for tests}
-\item{t_pval}{P-values for tests}
-\item{models}{The results for selected models}
-\item{plots}{Grid-arranged Acf and Pacf plots for each difference sequence}
-}
 }
 \description{
 This function allows to select by informational criteria and performance results one or a serie of different models allowing for best performance in and out of sample. The function is a wrapper for forecast and tseries packages.
 }
 \examples{
-ARIMAanalyse(seriex, 
-     laglim = 5, crossvalid = c(2015, 4), limit = 3, 
-     method = "ML")
+ARIMAanalyse = function(seriex, 
+   orderlim = c(1, 1, 1), seasonallim = c(1, 1, 1), 
+   crossvalid = c(2015, 4), limit = 3, 
+   method = "ML", adf.plim = 0.1, partlim = 0.3)
+   
 }
-\keyword{MCOanalyse}
+\keyword{ARIMAanalyse}
