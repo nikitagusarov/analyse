@@ -3,6 +3,8 @@
 export(ARIMAanalyse)
 export(LASSOanalyse)
 export(MCOanalyse)
+export(optimise.df)
+export(test.df)
 import(car)
 import(doParallel)
 import(filehash)

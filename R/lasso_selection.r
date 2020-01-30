@@ -32,16 +32,6 @@ LASSOanalyse = function(datax, # Explanatory variables dataframe
     modlim = 1,
     varlim = 10 # Limit of the variables to inlude into final model
     ) {
-# Testing
-# df = read.csv("./groupe_residentiel/data/derived_data/df3.csv")
-# dependent = df[,8]
-# datax = log(df[,c(14:18)])
-# rm(df)
-# laglim = 3 # Lag limit 
-# plim = 0.1 # Probability trashhold for tests
-# limit = 5
-# study.t0 = FALSE
-# varlim = 8
     ###############
     # Load packages
     cat("Stage 1 \n")
@@ -105,11 +95,11 @@ LASSOanalyse = function(datax, # Explanatory variables dataframe
     cat("Stage 3 \n")
     # Data
     # NA treatment 
-    nas = which(is.na(database), arr.ind=TRUE)
+    nas = which(is.na(database), arr.ind = TRUE)
     nas = unique(nas[,1])
     # Subsetting rows without NAs
     databaseX = as.matrix(database[-nas,])
-    dependent = as.matrix(dependent[-nas,])
+    dependent = as.matrix(dependent[-nas])
     # LASSO Cross validation
     res_lasso = cv.glmnet(databaseX, dependent,
         nfolds = folds)
