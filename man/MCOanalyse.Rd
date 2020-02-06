@@ -4,8 +4,8 @@
 \alias{MCOanalyse}
 \title{MCO automation function : Parallelized approach}
 \usage{
-MCOanalyse(datax, dependent, laglim = 2, plim = 0.1, limit = 5,
-  study.t0 = FALSE, varlim = 10)
+MCOanalyse(datax, dependent, laglim = 2, plim = 0.1, limit = 1,
+  study.t0 = FALSE, varlim = 10, valid = TRUE, part = 0.15)
 }
 \arguments{
 \item{datax}{A data.frame of explicative variables to be studied of length equal to explicative variable vector}
@@ -20,7 +20,11 @@ MCOanalyse(datax, dependent, laglim = 2, plim = 0.1, limit = 5,
 
 \item{study.t0}{A logical value indicating whether the t0 period should be taken into account}
 
-\item{varlim}{A maximal number of variables to make combinations of (large number significantly increases computation time)}
+\item{varlim}{A maximal number of variables to make combinations of (large number significantly increases computation time, each supplementary variable increases the tyme by 2)}
+
+\item{valid}{LOGICAL, indicates whether the crossvalidation procedure should be applied during the model selection}
+
+\item{part}{The part of the sample to be used for crossvalidation (by default 15%)}
 }
 \value{
 A list of selected models estimated with OLS with additional performance information

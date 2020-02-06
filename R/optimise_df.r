@@ -69,7 +69,7 @@ optimise.df = function(datax, season) {
     tr = datax %>% 
         mutate(t = 1:nrow(datax)) %>%
         na.omit()
-    for (i in 2:ncol(df)) {
+    for (i in 3:ncol(df)) {
         if (df[2,i] < 0.1) {
             tr[,i] = tr[,i] - lm(tr[,i] ~ tr$t)$fit
             colnames(tr)[i] = paste0("d_", colnames(tr)[i])
